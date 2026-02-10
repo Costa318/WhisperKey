@@ -12,6 +12,7 @@ final class AudioRecorder {
     private var recordingURL: URL?
     private var startTime: Date?
     private var maxDurationTimer: Timer?
+    private let writeQueue = DispatchQueue(label: "com.whisperkey.audiowrite")
 
     private(set) var isRecording = false
     var onMaxDurationReached: (() -> Void)?
@@ -22,27 +23,52 @@ final class AudioRecorder {
 
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
+        let hardwareFormat = inputNode.outputFormat(forBus: 0)
 
+        // Validate the hardware format — can be degenerate if mic access isn't ready
+        guard hardwareFormat.channelCount > 0, hardwareFormat.sampleRate > 0 else {
+            throw RecordingError.invalidInputFormat
+        }
+
+        // Target: 16kHz mono Int16 on disk, Float32 for processing
+        let fileSettings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVSampleRateKey: 16000,
+            AVNumberOfChannelsKey: 1,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+        ]
+
+        // processingFormat = Float32 16kHz mono — this is the format we must write
+        let file = try AVAudioFile(
+            forWriting: url,
+            settings: fileSettings,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+
+        // Use AVAudioConverter to go from hardware format → Float32 16kHz mono
         guard
             let targetFormat = AVAudioFormat(
-                commonFormat: .pcmFormatInt16,
+                commonFormat: .pcmFormatFloat32,
                 sampleRate: 16000,
                 channels: 1,
-                interleaved: true
+                interleaved: false
             )
         else {
             throw RecordingError.formatCreationFailed
         }
 
-        let file = try AVAudioFile(forWriting: url, settings: targetFormat.settings)
-
-        guard let converter = AVAudioConverter(from: inputFormat, to: targetFormat) else {
+        guard let converter = AVAudioConverter(from: hardwareFormat, to: targetFormat) else {
             throw RecordingError.converterCreationFailed
         }
 
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
-            let ratio = 16000.0 / inputFormat.sampleRate
+        let writeQueue = self.writeQueue
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: hardwareFormat) {
+            buffer, _ in
+            let ratio = targetFormat.sampleRate / hardwareFormat.sampleRate
             let outputFrameCount = AVAudioFrameCount(Double(buffer.frameLength) * ratio)
 
             guard outputFrameCount > 0,
@@ -63,7 +89,9 @@ final class AudioRecorder {
             }
 
             if error == nil, outputBuffer.frameLength > 0 {
-                try? file.write(from: outputBuffer)
+                writeQueue.async {
+                    try? file.write(from: outputBuffer)
+                }
             }
         }
 
@@ -90,6 +118,9 @@ final class AudioRecorder {
         audioEngine?.inputNode.removeTap(onBus: 0)
         audioEngine?.stop()
         audioEngine = nil
+
+        // Wait for any pending writes to finish before closing the file
+        writeQueue.sync {}
         audioFile = nil
         isRecording = false
 
@@ -110,11 +141,13 @@ final class AudioRecorder {
     enum RecordingError: LocalizedError {
         case formatCreationFailed
         case converterCreationFailed
+        case invalidInputFormat
 
         var errorDescription: String? {
             switch self {
             case .formatCreationFailed: "Failed to create target audio format"
             case .converterCreationFailed: "Failed to create audio format converter"
+            case .invalidInputFormat: "No valid audio input found. Check microphone access."
             }
         }
     }

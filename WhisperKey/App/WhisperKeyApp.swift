@@ -58,6 +58,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self, selector: #selector(setupDidComplete),
             name: .whisperKeySetupCompleted, object: nil
         )
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(hotkeyDidChange),
+            name: .hotkeyChanged, object: nil
+        )
     }
 
     // MARK: - Hotkey Flow
@@ -74,6 +79,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startRecording() {
+        let authStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        guard authStatus == .authorized else {
+            if authStatus == .notDetermined {
+                AVCaptureDevice.requestAccess(for: .audio) { _ in }
+                postNotification("Please grant microphone access and try again.")
+            } else {
+                postNotification("Microphone access denied. Enable it in System Settings.")
+            }
+            return
+        }
+
         do {
             try audioRecorder.startRecording()
             AppState.shared.status = .recording
@@ -153,6 +169,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppState.shared.status = .idle
         statusBar.updateForState(.idle)
         hotkeyManager.register()
+        checkMicrophonePermission()
+    }
+
+    @objc private func hotkeyDidChange() {
+        hotkeyManager.reregister()
     }
 
     // MARK: - Settings

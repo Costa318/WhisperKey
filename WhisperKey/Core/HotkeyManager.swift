@@ -1,3 +1,4 @@
+import AppKit
 import HotKey
 
 final class HotkeyManager {
@@ -5,7 +6,12 @@ final class HotkeyManager {
     var onHotkeyPressed: (() -> Void)?
 
     func register() {
-        hotKey = HotKey(key: .space, modifiers: [.option])
+        let prefs = Preferences.shared
+        guard let key = Key(carbonKeyCode: prefs.hotkeyKeyCode) else { return }
+        let modifiers = NSEvent.ModifierFlags(rawValue: prefs.hotkeyModifiers)
+            .intersection([.command, .option, .control, .shift])
+
+        hotKey = HotKey(key: key, modifiers: modifiers)
         hotKey?.keyDownHandler = { [weak self] in
             self?.onHotkeyPressed?()
         }
@@ -13,5 +19,10 @@ final class HotkeyManager {
 
     func unregister() {
         hotKey = nil
+    }
+
+    func reregister() {
+        unregister()
+        register()
     }
 }

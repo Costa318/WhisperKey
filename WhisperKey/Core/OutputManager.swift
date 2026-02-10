@@ -3,33 +3,46 @@ import ApplicationServices
 import UserNotifications
 
 final class OutputManager {
+    private var hasPromptedForAccessibility = false
+
     func output(text: String) {
         // Always copy to clipboard
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
 
-        if Preferences.shared.autoPaste && AXIsProcessTrusted() {
-            // Brief delay to ensure the previously active app regains focus
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        let trusted = AXIsProcessTrusted()
+        let autoPaste = Preferences.shared.autoPaste
+
+        if autoPaste && trusted {
+            // Delay to ensure the previously active app regains focus after transcription
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 self.simulatePaste()
             }
+        } else if autoPaste && !trusted && !hasPromptedForAccessibility {
+            // Prompt once to grant Accessibility — opens System Settings
+            hasPromptedForAccessibility = true
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            AXIsProcessTrustedWithOptions(options)
+            showNotification(text: text)
         } else {
             showNotification(text: text)
         }
     }
 
     private func simulatePaste() {
-        let source = CGEventSource(stateID: .hidSystemState)
+        guard let source = CGEventSource(stateID: .privateState) else { return }
 
         // Virtual key code 0x09 = V
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true)
-        keyDown?.flags = .maskCommand
-        keyDown?.post(tap: .cghidEventTap)
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
+        else { return }
 
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-        keyUp?.flags = .maskCommand
-        keyUp?.post(tap: .cghidEventTap)
+        keyDown.flags = .maskCommand
+        keyUp.flags = .maskCommand
+
+        keyDown.post(tap: .cghidEventTap)
+        keyUp.post(tap: .cghidEventTap)
     }
 
     private func showNotification(text: String) {

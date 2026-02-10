@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 
@@ -13,6 +14,13 @@ final class Preferences {
     var autoPaste: Bool { didSet { defaults.set(autoPaste, forKey: "autoPaste") } }
     var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
     var soundFeedback: Bool { didSet { defaults.set(soundFeedback, forKey: "soundFeedback") } }
+
+    // MARK: - Hotkey
+
+    /// Virtual key code (e.g. 0x31 = Space, 0x10 = Y)
+    var hotkeyKeyCode: UInt32 { didSet { defaults.set(hotkeyKeyCode, forKey: "hotkeyKeyCode") } }
+    /// Raw NSEvent.ModifierFlags value (e.g. option = 524288)
+    var hotkeyModifiers: UInt { didSet { defaults.set(hotkeyModifiers, forKey: "hotkeyModifiers") } }
 
     // MARK: - Advanced
 
@@ -41,6 +49,8 @@ final class Preferences {
             "autoPaste": true,
             "launchAtLogin": false,
             "soundFeedback": false,
+            "hotkeyKeyCode": 0x31,  // Space
+            "hotkeyModifiers": NSEvent.ModifierFlags.option.rawValue,
             "whisperCLIPath": Self.defaultWhisperCLIPath,
             "modelPath": Self.defaultModelPath,
             "threadCount": 4,
@@ -51,6 +61,10 @@ final class Preferences {
         autoPaste = defaults.bool(forKey: "autoPaste")
         launchAtLogin = defaults.bool(forKey: "launchAtLogin")
         soundFeedback = defaults.bool(forKey: "soundFeedback")
+        let storedKeyCode = defaults.object(forKey: "hotkeyKeyCode") as? UInt32 ?? 0x31
+        hotkeyKeyCode = storedKeyCode
+        let storedModifiers = defaults.object(forKey: "hotkeyModifiers") as? UInt ?? NSEvent.ModifierFlags.option.rawValue
+        hotkeyModifiers = storedModifiers
         whisperCLIPath = defaults.string(forKey: "whisperCLIPath") ?? Self.defaultWhisperCLIPath
         modelPath = defaults.string(forKey: "modelPath") ?? Self.defaultModelPath
         threadCount = max(1, defaults.integer(forKey: "threadCount"))

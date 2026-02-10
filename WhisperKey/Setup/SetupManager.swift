@@ -154,7 +154,7 @@ final class SetupManager {
 
         try await runProcess(
             "/usr/bin/env",
-            arguments: ["cmake", "-B", "build", "-DWHISPER_METAL=ON"],
+            arguments: ["cmake", "-B", "build", "-DGGML_METAL=ON", "-DBUILD_SHARED_LIBS=OFF"],
             currentDirectory: sourceDir
         )
 

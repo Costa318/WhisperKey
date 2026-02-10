@@ -532,9 +532,7 @@ private struct ReadyStepView: View {
             Spacer()
 
             Button("Start Using WhisperKey") {
-                if launchAtLogin {
-                    enableLaunchAtLogin()
-                }
+                applyLaunchAtLogin()
                 onFinish()
             }
             .keyboardShortcut(.defaultAction)
@@ -542,9 +540,14 @@ private struct ReadyStepView: View {
         }
     }
 
-    private func enableLaunchAtLogin() {
+    private func applyLaunchAtLogin() {
+        Preferences.shared.launchAtLogin = launchAtLogin
         if #available(macOS 13.0, *) {
-            try? SMAppService.mainApp.register()
+            if launchAtLogin {
+                try? SMAppService.mainApp.register()
+            } else {
+                try? SMAppService.mainApp.unregister()
+            }
         }
     }
 }
