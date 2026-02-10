@@ -152,19 +152,12 @@ final class SetupManager {
     private func compileWhisperCpp() async throws {
         let sourceDir = "/tmp/whisperkey-build/whisper.cpp"
 
-        try await runProcess(
-            "/usr/bin/env",
-            arguments: ["cmake", "-B", "build", "-DGGML_METAL=ON", "-DBUILD_SHARED_LIBS=OFF"],
-            currentDirectory: sourceDir
-        )
-
+        // Use make instead of cmake — make is included in Xcode Command Line Tools,
+        // cmake is not. Metal is auto-enabled on macOS. Build is statically linked.
         let cpuCount = ProcessInfo.processInfo.activeProcessorCount
         try await runProcess(
-            "/usr/bin/env",
-            arguments: [
-                "cmake", "--build", "build", "--config", "Release",
-                "-j\(cpuCount)",
-            ],
+            "/usr/bin/make",
+            arguments: ["-j\(cpuCount)", "whisper-cli"],
             currentDirectory: sourceDir
         )
 
