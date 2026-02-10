@@ -30,3 +30,6 @@ Package.resolved
 # WhisperKey runtime files
 *.bin
 .whisperkey/
+
+# Release artifacts (distributed via GitHub Releases)
+releases/
