@@ -10,9 +10,21 @@ WhisperKey sits in your menu bar and uses [whisper.cpp](https://github.com/ggerg
 - **Fully local** — everything runs on-device, nothing is sent to the cloud
 - **Minimal footprint** — <20MB RAM when idle, model memory released after each transcription
 - **Auto-paste** — transcribed text is automatically pasted into your active app (optional)
-- **Multi-language** — supports German, English, and auto-detection via the `ggml-medium` model
+- **Multi-language** — auto-detects and transcribes many languages
 - **First-launch wizard** — guided setup that downloads and compiles whisper.cpp for you
 - **Apple Silicon optimized** — Metal GPU acceleration for fast transcription
+
+## Language Support
+
+Just speak — WhisperKey auto-detects the language:
+
+> *Do you speak English?*
+> *Kannst du Deutsch sprechen?*
+> *Hablas español?*
+> *हिंडि जानता हो*
+> *พูดภาษาไทยได้ไหม*
+
+The `ggml-medium` model supports 20+ languages out of the box, including English, German, Spanish, French, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Turkish, Japanese, Korean, Chinese, Hindi, Thai, Arabic, Indonesian, Vietnamese, and Swedish. You can pin a specific language in Settings or leave it on Auto to let the model detect it.
 
 ## Requirements
 
@@ -78,7 +90,7 @@ The menu bar icon shows the current state:
 Click the menu bar icon and select **Settings** to configure:
 
 - **Hotkey** — click the hotkey field and press a new key combination
-- **Language** — Auto (recommended), German, or English
+- **Language** — Auto (recommended) or pin a specific language from 20+ options
 - **Auto-paste** — automatically paste transcriptions into the active app
 - **Launch at Login** — start WhisperKey when you log in
 - **Sound feedback** — play a sound when recording starts/stops

@@ -33,8 +33,27 @@ struct SettingsView: View {
             Section("Transcription") {
                 Picker("Language", selection: $preferences.language) {
                     Text("Auto (recommended)").tag("auto")
-                    Text("German").tag("de")
+                    Divider()
                     Text("English").tag("en")
+                    Text("German").tag("de")
+                    Text("Spanish").tag("es")
+                    Text("French").tag("fr")
+                    Text("Italian").tag("it")
+                    Text("Portuguese").tag("pt")
+                    Text("Dutch").tag("nl")
+                    Text("Polish").tag("pl")
+                    Text("Russian").tag("ru")
+                    Text("Ukrainian").tag("uk")
+                    Text("Turkish").tag("tr")
+                    Text("Japanese").tag("ja")
+                    Text("Korean").tag("ko")
+                    Text("Chinese").tag("zh")
+                    Text("Hindi").tag("hi")
+                    Text("Thai").tag("th")
+                    Text("Arabic").tag("ar")
+                    Text("Indonesian").tag("id")
+                    Text("Vietnamese").tag("vi")
+                    Text("Swedish").tag("sv")
                 }
             }
 

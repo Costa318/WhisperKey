@@ -48,34 +48,37 @@ final class StatusBarController {
     }
 
     func updateForState(_ state: AppState.Status) {
+        guard let button = statusItem.button else { return }
+
         switch state {
         case .idle, .setup:
             statusMenuItem.title = "Press ⌥Space to record"
-            setIcon(name: "waveform", isTemplate: true)
+            setCustomIcon(on: button)
         case .recording:
             statusMenuItem.title = "Recording... Press ⌥Space to stop"
-            setIcon(name: "waveform", tintColor: .systemRed)
+            setCustomIcon(on: button, tintColor: .systemRed)
         case .transcribing:
             statusMenuItem.title = "Transcribing..."
-            setIcon(name: "ellipsis.circle", isTemplate: true)
+            setCustomIcon(on: button, tintColor: .systemOrange)
         }
     }
 
-    private func setIcon(name: String, isTemplate: Bool = false, tintColor: NSColor? = nil) {
-        guard let button = statusItem.button else { return }
-        let config = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: "WhisperKey")
-        else { return }
+    private func setCustomIcon(on button: NSStatusBarButton, tintColor: NSColor? = nil) {
+        guard let baseImage = NSImage(named: "MenuBarIcon") else { return }
 
         if let tintColor {
-            let colored = image.withSymbolConfiguration(config)
+            // Bake color into pixels so macOS can't override it
+            let colored = NSImage(size: baseImage.size, flipped: false) { rect in
+                baseImage.draw(in: rect)
+                tintColor.set()
+                rect.fill(using: .sourceAtop)
+                return true
+            }
+            colored.isTemplate = false
             button.image = colored
-            button.contentTintColor = tintColor
         } else {
-            let img = image.withSymbolConfiguration(config)
-            img?.isTemplate = isTemplate
-            button.image = img
-            button.contentTintColor = nil
+            baseImage.isTemplate = true
+            button.image = baseImage
         }
     }
 
