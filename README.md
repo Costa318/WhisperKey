@@ -19,9 +19,13 @@ WhisperKey sits in your menu bar and uses [whisper.cpp](https://github.com/ggerg
 Just speak — WhisperKey auto-detects the language:
 
 > *Do you speak English?*
+>
 > *Kannst du Deutsch sprechen?*
+>
 > *Hablas español?*
+>
 > *हिंडि जानता हो*
+>
 > *พูดภาษาไทยได้ไหม*
 
 The `ggml-medium` model supports 20+ languages out of the box, including English, German, Spanish, French, Italian, Portuguese, Dutch, Polish, Russian, Ukrainian, Turkish, Japanese, Korean, Chinese, Hindi, Thai, Arabic, Indonesian, Vietnamese, and Swedish. You can pin a specific language in Settings or leave it on Auto to let the model detect it.
