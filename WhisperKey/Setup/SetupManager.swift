@@ -75,6 +75,68 @@ final class SetupManager {
         try? process.run()
     }
 
+    /// Find cmake binary — check system paths, then temp build dir
+    private func findCmakePath() -> String? {
+        let candidates = [
+            "/opt/homebrew/bin/cmake",
+            "/usr/local/bin/cmake",
+            "/Applications/CMake.app/Contents/bin/cmake",
+            "/usr/bin/cmake",
+        ]
+        for path in candidates {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                return path
+            }
+        }
+        return nil
+    }
+
+    /// Download cmake to temp build dir if not installed on system
+    private static let cmakeVersion = "3.31.4"
+    private static let cmakeDirName = "cmake-\(cmakeVersion)-macos-universal"
+    private static let cmakeURL =
+        "https://github.com/Kitware/CMake/releases/download/v\(cmakeVersion)/\(cmakeDirName).tar.gz"
+
+    private func ensureCmake() async throws -> String {
+        // Fast path: cmake already on the system
+        if let systemCmake = findCmakePath() {
+            await appendLog("Found cmake at \(systemCmake)")
+            return systemCmake
+        }
+
+        // Download cmake as a temporary build tool
+        await appendLog("cmake not found on system, downloading temporary copy...")
+        let buildDir = "/tmp/whisperkey-build"
+        let tarPath = "\(buildDir)/cmake.tar.gz"
+        let cmakeBin = "\(buildDir)/\(Self.cmakeDirName)/CMake.app/Contents/bin/cmake"
+
+        // Download
+        try await runProcess(
+            "/usr/bin/curl",
+            arguments: ["-L", "-o", tarPath, Self.cmakeURL]
+        )
+
+        // Extract
+        try await runProcess(
+            "/usr/bin/tar",
+            arguments: ["xzf", tarPath, "-C", buildDir]
+        )
+
+        // Clean up tarball
+        try? FileManager.default.removeItem(atPath: tarPath)
+
+        guard FileManager.default.isExecutableFile(atPath: cmakeBin) else {
+            throw NSError(
+                domain: "SetupManager", code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Failed to download cmake. Check your internet connection and try again."
+                ])
+        }
+
+        await appendLog("Downloaded cmake \(Self.cmakeVersion)")
+        return cmakeBin
+    }
+
     // MARK: - Installation
 
     @MainActor
@@ -152,12 +214,18 @@ final class SetupManager {
     private func compileWhisperCpp() async throws {
         let sourceDir = "/tmp/whisperkey-build/whisper.cpp"
 
-        // Use make instead of cmake — make is included in Xcode Command Line Tools,
-        // cmake is not. Metal is auto-enabled on macOS. Build is statically linked.
+        let cmake = try await ensureCmake()
+
+        try await runProcess(
+            cmake,
+            arguments: ["-B", "build", "-DGGML_METAL=ON", "-DBUILD_SHARED_LIBS=OFF"],
+            currentDirectory: sourceDir
+        )
+
         let cpuCount = ProcessInfo.processInfo.activeProcessorCount
         try await runProcess(
-            "/usr/bin/make",
-            arguments: ["-j\(cpuCount)", "whisper-cli"],
+            cmake,
+            arguments: ["--build", "build", "--config", "Release", "-j\(cpuCount)"],
             currentDirectory: sourceDir
         )
 
