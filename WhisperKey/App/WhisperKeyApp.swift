@@ -48,6 +48,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyManager.onHotkeyPressed = { [weak self] in self?.handleHotkey() }
 
         if AppState.shared.needsSetup {
+            // Become a regular foreground app during setup so macOS shows
+            // TCC permission dialogs (LSUIElement/accessory apps can't trigger them).
+            NSApp.setActivationPolicy(.regular)
             showSetupWizard()
         } else {
             hotkeyManager.register()
@@ -79,10 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startRecording() {
-        let authStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        guard authStatus == .authorized else {
-            if authStatus == .notDetermined {
-                AVCaptureDevice.requestAccess(for: .audio) { _ in }
+        let permission = AVAudioApplication.shared.recordPermission
+        guard permission == .granted else {
+            if permission == .undetermined {
+                AVAudioApplication.requestRecordPermission { _ in }
                 postNotification("Please grant microphone access and try again.")
             } else {
                 postNotification("Microphone access denied. Enable it in System Settings.")
@@ -166,6 +169,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func setupDidComplete() {
         setupWindowController?.close()
         setupWindowController = nil
+        // Switch back to menu-bar-only (accessory) mode now that setup is done
+        NSApp.setActivationPolicy(.accessory)
         AppState.shared.status = .idle
         statusBar.updateForState(.idle)
         hotkeyManager.register()
@@ -199,8 +204,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Permissions
 
     private func checkMicrophonePermission() {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .denied, .restricted:
+        switch AVAudioApplication.shared.recordPermission {
+        case .denied:
             let alert = NSAlert()
             alert.messageText = "Microphone Access Required"
             alert.informativeText =

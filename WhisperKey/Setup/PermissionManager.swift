@@ -1,3 +1,4 @@
+import AVFAudio
 import AVFoundation
 import ApplicationServices
 import AppKit
@@ -6,9 +7,11 @@ import Observation
 @Observable
 final class PermissionManager {
     var microphoneGranted = false
+    var microphoneDenied = false
     var accessibilityGranted = false
 
     private var pollTimer: Timer?
+    private var micPollTimer: Timer?
 
     init() {
         checkMicrophoneStatus()
@@ -16,19 +19,30 @@ final class PermissionManager {
     }
 
     func checkMicrophoneStatus() {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
-            microphoneGranted = true
-        default:
-            microphoneGranted = false
+        let permission = AVAudioApplication.shared.recordPermission
+        microphoneGranted = permission == .granted
+        microphoneDenied = permission == .denied
+    }
+
+    func requestMicrophoneAccess() {
+        AVAudioApplication.requestRecordPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                self?.microphoneGranted = granted
+                self?.microphoneDenied = !granted
+            }
         }
     }
 
-    func requestMicrophoneAccess() async {
-        let granted = await AVCaptureDevice.requestAccess(for: .audio)
-        await MainActor.run {
-            microphoneGranted = granted
+    func startPollingMicrophone() {
+        micPollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) {
+            [weak self] _ in
+            self?.checkMicrophoneStatus()
         }
+    }
+
+    func stopPollingMicrophone() {
+        micPollTimer?.invalidate()
+        micPollTimer = nil
     }
 
     func checkAccessibilityStatus() {

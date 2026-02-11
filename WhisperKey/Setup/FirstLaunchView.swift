@@ -410,6 +410,10 @@ private struct PermissionsStepView: View {
                             Text("Microphone access granted")
                                 .font(.caption)
                                 .foregroundStyle(.green)
+                        } else if permissionManager.microphoneDenied {
+                            Text("Access denied — click Grant Access to try again")
+                                .font(.caption)
+                                .foregroundStyle(.red)
                         } else {
                             Text("Required for recording speech")
                                 .font(.caption)
@@ -421,7 +425,7 @@ private struct PermissionsStepView: View {
 
                     if !permissionManager.microphoneGranted {
                         Button("Grant Access") {
-                            Task { await permissionManager.requestMicrophoneAccess() }
+                            permissionManager.requestMicrophoneAccess()
                         }
                     }
                 }
@@ -493,9 +497,11 @@ private struct PermissionsStepView: View {
         }
         .onAppear {
             permissionManager.startPollingAccessibility()
+            permissionManager.startPollingMicrophone()
         }
         .onDisappear {
             permissionManager.stopPollingAccessibility()
+            permissionManager.stopPollingMicrophone()
         }
     }
 }
