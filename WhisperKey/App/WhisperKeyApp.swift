@@ -20,6 +20,7 @@ struct WhisperKeyApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBar: StatusBarController!
     private var hotkeyManager: HotkeyManager!
+    private var mouseTriggerManager: MouseTriggerManager!
     private var audioRecorder: AudioRecorder!
     private var transcriber: WhisperTranscriber!
     private var outputManager: OutputManager!
@@ -43,9 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async { self?.stopRecordingAndTranscribe() }
         }
 
-        // Hotkey
+        // Triggers
+        Preferences.migrateIfNeeded()
         hotkeyManager = HotkeyManager()
         hotkeyManager.onHotkeyPressed = { [weak self] in self?.handleHotkey() }
+        mouseTriggerManager = MouseTriggerManager()
+        mouseTriggerManager.onTrigger = { [weak self] in self?.handleHotkey() }
 
         if AppState.shared.needsSetup {
             // Become a regular foreground app during setup so macOS shows
@@ -53,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.setActivationPolicy(.regular)
             showSetupWizard()
         } else {
-            hotkeyManager.register()
+            registerTriggers()
             checkMicrophonePermission()
         }
 
@@ -63,8 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         NotificationCenter.default.addObserver(
-            self, selector: #selector(hotkeyDidChange),
-            name: .hotkeyChanged, object: nil
+            self, selector: #selector(triggersDidChange),
+            name: .triggerChanged, object: nil
         )
     }
 
@@ -173,12 +177,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         AppState.shared.status = .idle
         statusBar.updateForState(.idle)
-        hotkeyManager.register()
+        registerTriggers()
         checkMicrophonePermission()
     }
 
-    @objc private func hotkeyDidChange() {
+    @objc private func triggersDidChange() {
+        registerTriggers()
+    }
+
+    private func registerTriggers() {
         hotkeyManager.reregister()
+        mouseTriggerManager.restart()
     }
 
     // MARK: - Settings
@@ -186,7 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showSettings() {
         if settingsWindowController == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 460, height: 320),
+                contentRect: NSRect(x: 0, y: 0, width: 460, height: 380),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false

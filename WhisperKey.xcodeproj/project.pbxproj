@@ -22,6 +22,7 @@
 		F8A1B2C300000000000B06AA /* OutputManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1B2C300000000000A06AA /* OutputManager.swift */; };
 		F8A1B2C300000000000B07AA /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1B2C300000000000A07AA /* HotkeyManager.swift */; };
 		F8A1B2C300000000000B08AA /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = F8A1B2C300000000000D02AA /* HotKey */; };
+		F8A1B2C300000000000B09AA /* MouseTriggerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1B2C300000000000A08AA /* MouseTriggerManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		F8A1B2C300000000000A05AA /* WhisperTranscriber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperTranscriber.swift; sourceTree = "<group>"; };
 		F8A1B2C300000000000A06AA /* OutputManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputManager.swift; sourceTree = "<group>"; };
 		F8A1B2C300000000000A07AA /* HotkeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyManager.swift; sourceTree = "<group>"; };
+		F8A1B2C300000000000A08AA /* MouseTriggerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseTriggerManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -115,6 +117,7 @@
 				F8A1B2C300000000000A05AA /* WhisperTranscriber.swift */,
 				F8A1B2C300000000000A06AA /* OutputManager.swift */,
 				F8A1B2C300000000000A07AA /* HotkeyManager.swift */,
+				F8A1B2C300000000000A08AA /* MouseTriggerManager.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -223,6 +226,7 @@
 				F8A1B2C300000000000B05AA /* WhisperTranscriber.swift in Sources */,
 				F8A1B2C300000000000B06AA /* OutputManager.swift in Sources */,
 				F8A1B2C300000000000B07AA /* HotkeyManager.swift in Sources */,
+				F8A1B2C300000000000B09AA /* MouseTriggerManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

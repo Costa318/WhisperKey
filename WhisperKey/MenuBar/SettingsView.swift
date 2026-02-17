@@ -1,3 +1,4 @@
+import ApplicationServices
 import SwiftUI
 
 struct SettingsView: View {
@@ -15,7 +16,7 @@ struct SettingsView: View {
                 .tabItem { Label("Advanced", systemImage: "gearshape.2") }
                 .tag(1)
         }
-        .frame(width: 460, height: 320)
+        .frame(width: 460, height: 380)
         .fixedSize()
     }
 
@@ -23,10 +24,43 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            Section("Hotkey") {
+            Section("Triggers") {
                 HStack {
-                    Text("Record / Stop:")
-                    HotkeyRecorderView()
+                    Text("Primary:")
+                    TriggerRecorderView(slot: .primary)
+                }
+                HStack {
+                    Text("Alternative:")
+                    TriggerRecorderView(slot: .alt)
+                        .opacity(preferences.altEnabled ? 1 : 0.5)
+                        .disabled(!preferences.altEnabled)
+                }
+                Toggle("Enable alternative trigger", isOn: Binding(
+                    get: { preferences.altEnabled },
+                    set: { newValue in
+                        preferences.altEnabled = newValue
+                        NotificationCenter.default.post(name: .triggerChanged, object: nil)
+                    }
+                ))
+
+                if hasMouseTrigger && !AXIsProcessTrusted() {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("Accessibility permission required for mouse triggers")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Open Settings") {
+                            if let url = URL(
+                                string:
+                                    "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+                            ) {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .font(.caption)
+                    }
                 }
             }
 
@@ -67,6 +101,11 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var hasMouseTrigger: Bool {
+        preferences.primaryType == "mouse"
+            || (preferences.altEnabled && preferences.altType == "mouse")
     }
 
     // MARK: - Advanced Tab
@@ -117,17 +156,28 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Hotkey Recorder
+// MARK: - Trigger Recorder
 
-private struct HotkeyRecorderView: View {
+enum TriggerSlot {
+    case primary
+    case alt
+}
+
+private struct TriggerRecorderView: View {
+    let slot: TriggerSlot
+
     @State private var isRecording = false
     @State private var displayText: String = ""
-    @State private var monitor: Any?
+    @State private var keyMonitor: Any?
+    @State private var mouseMonitor: Any?
+    @State private var pendingMouseButton: Int?
+    @State private var pendingMouseModifiers: UInt = 0
+    @State private var doubleClickTimer: DispatchWorkItem?
 
     var body: some View {
-        Button(action: { startRecording() }) {
-            Text(isRecording ? "Press shortcut..." : displayText)
-                .frame(minWidth: 100)
+        Button(action: { isRecording ? stopRecording() : startRecording() }) {
+            Text(isRecording ? "Press key or click mouse..." : displayText)
+                .frame(minWidth: 140)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .font(.system(.body, design: .monospaced))
@@ -140,55 +190,153 @@ private struct HotkeyRecorderView: View {
     private func startRecording() {
         guard !isRecording else { return }
         isRecording = true
+        pendingMouseButton = nil
 
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
-            // Escape cancels
+        // Listen for keyboard events
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { event in
             if event.keyCode == 53 {
                 stopRecording()
                 return nil
             }
 
-            let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
-
-            // Require at least one modifier key
+            let modifiers = event.modifierFlags.intersection(
+                [.command, .option, .control, .shift])
             guard !modifiers.isEmpty else { return nil }
 
             let prefs = Preferences.shared
-            prefs.hotkeyKeyCode = UInt32(event.keyCode)
-            prefs.hotkeyModifiers = modifiers.rawValue
+            switch slot {
+            case .primary:
+                prefs.primaryType = "keyboard"
+                prefs.primaryKeyCode = UInt32(event.keyCode)
+                prefs.primaryModifiers = modifiers.rawValue
+            case .alt:
+                prefs.altType = "keyboard"
+                prefs.altKeyCode = UInt32(event.keyCode)
+                prefs.altModifiers = modifiers.rawValue
+            }
 
             stopRecording()
             updateDisplayText()
+            NotificationCenter.default.post(name: .triggerChanged, object: nil)
+            return nil
+        }
 
-            // Notify HotkeyManager to re-register
-            NotificationCenter.default.post(name: .hotkeyChanged, object: nil)
+        // Listen for mouse button events (middle click, side buttons)
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseDown]) { event in
+            let button = event.buttonNumber
+            let modifiers = event.modifierFlags.intersection(
+                [.command, .option, .control, .shift])
+
+            if let pending = pendingMouseButton, pending == button {
+                // Second click on same button — store as double-click
+                doubleClickTimer?.cancel()
+                doubleClickTimer = nil
+                pendingMouseButton = nil
+                saveMouse(button: button, modifiers: modifiers, doubleClick: true)
+                return nil
+            }
+
+            // First click — wait for potential double-click
+            pendingMouseButton = button
+            pendingMouseModifiers = modifiers.rawValue
+            doubleClickTimer?.cancel()
+            let timer = DispatchWorkItem {
+                // Timeout — store as single click
+                saveMouse(
+                    button: button,
+                    modifiers: NSEvent.ModifierFlags(rawValue: pendingMouseModifiers),
+                    doubleClick: false
+                )
+                pendingMouseButton = nil
+            }
+            doubleClickTimer = timer
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: timer)
 
             return nil
         }
     }
 
+    private func saveMouse(button: Int, modifiers: NSEvent.ModifierFlags, doubleClick: Bool) {
+        let prefs = Preferences.shared
+        switch slot {
+        case .primary:
+            prefs.primaryType = "mouse"
+            prefs.primaryMouseButton = button
+            prefs.primaryModifiers = modifiers.rawValue
+            prefs.primaryDoubleClick = doubleClick
+        case .alt:
+            prefs.altType = "mouse"
+            prefs.altMouseButton = button
+            prefs.altModifiers = modifiers.rawValue
+            prefs.altDoubleClick = doubleClick
+        }
+
+        stopRecording()
+        updateDisplayText()
+        NotificationCenter.default.post(name: .triggerChanged, object: nil)
+    }
+
     private func stopRecording() {
         isRecording = false
-        if let monitor {
-            NSEvent.removeMonitor(monitor)
-        }
-        monitor = nil
+        doubleClickTimer?.cancel()
+        doubleClickTimer = nil
+        pendingMouseButton = nil
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
+        keyMonitor = nil
+        mouseMonitor = nil
     }
 
     private func updateDisplayText() {
         let prefs = Preferences.shared
-        let modifiers = NSEvent.ModifierFlags(rawValue: prefs.hotkeyModifiers)
-        displayText = Self.hotkeyDisplayString(keyCode: prefs.hotkeyKeyCode, modifiers: modifiers)
+        switch slot {
+        case .primary:
+            displayText = Self.triggerDisplayString(
+                type: prefs.primaryType,
+                keyCode: prefs.primaryKeyCode,
+                modifiers: prefs.primaryModifiers,
+                mouseButton: prefs.primaryMouseButton,
+                doubleClick: prefs.primaryDoubleClick
+            )
+        case .alt:
+            displayText = Self.triggerDisplayString(
+                type: prefs.altType,
+                keyCode: prefs.altKeyCode,
+                modifiers: prefs.altModifiers,
+                mouseButton: prefs.altMouseButton,
+                doubleClick: prefs.altDoubleClick
+            )
+        }
     }
 
-    static func hotkeyDisplayString(keyCode: UInt32, modifiers: NSEvent.ModifierFlags) -> String {
+    static func triggerDisplayString(
+        type: String, keyCode: UInt32, modifiers: UInt,
+        mouseButton: Int, doubleClick: Bool
+    ) -> String {
+        let mods = NSEvent.ModifierFlags(rawValue: modifiers)
         var parts: [String] = []
-        if modifiers.contains(.control) { parts.append("⌃") }
-        if modifiers.contains(.option) { parts.append("⌥") }
-        if modifiers.contains(.shift) { parts.append("⇧") }
-        if modifiers.contains(.command) { parts.append("⌘") }
-        parts.append(keyName(for: keyCode))
-        return parts.joined(separator: "")
+        if mods.contains(.control) { parts.append("⌃") }
+        if mods.contains(.option) { parts.append("⌥") }
+        if mods.contains(.shift) { parts.append("⇧") }
+        if mods.contains(.command) { parts.append("⌘") }
+
+        if type == "keyboard" {
+            parts.append(keyName(for: keyCode))
+            return parts.joined()
+        } else {
+            if doubleClick { parts.append("Double") }
+            parts.append(mouseButtonName(for: mouseButton))
+            return parts.joined(separator: " ")
+        }
+    }
+
+    private static func mouseButtonName(for button: Int) -> String {
+        switch button {
+        case 2: return "Middle Click"
+        case 3: return "Side Button 1"
+        case 4: return "Side Button 2"
+        default: return "Mouse Button \(button)"
+        }
     }
 
     private static func keyName(for keyCode: UInt32) -> String {
@@ -212,6 +360,8 @@ private struct HotkeyRecorderView: View {
     }
 }
 
+// MARK: - Notifications
+
 extension Notification.Name {
-    static let hotkeyChanged = Notification.Name("WhisperKeyHotkeyChanged")
+    static let triggerChanged = Notification.Name("WhisperKeyTriggerChanged")
 }
