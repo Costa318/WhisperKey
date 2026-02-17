@@ -55,10 +55,14 @@ The app checks both paths on launch. If missing → show setup wizard.
 ## Key Design Constraints
 
 - **No external scripts** — all setup (git clone, cmake, compile, download) runs as Swift `Process()` or URLSession within the app
+- **cmake auto-download** — if cmake is not on the system, `SetupManager.ensureCmake()` downloads a temporary copy from GitHub releases to `/tmp/whisperkey-build/`
 - **Subprocess-based transcription** — whisper-cli is invoked per-transcription so model memory is fully released when done
 - **Microphone is required**, Accessibility is optional (only for auto-paste via CGEvent)
 - **No sandboxing** — entitlements must have `com.apple.security.app-sandbox` set to NO
+- **Hardened Runtime** is enabled (Xcode default) — entitlements must include `com.apple.security.device.audio-input` or mic access silently fails
 - Info.plist must include `NSMicrophoneUsageDescription`
+- **LSUIElement + TCC dialogs** — during first-launch setup, the app switches to `NSApp.setActivationPolicy(.regular)` so macOS shows permission dialogs; switches back to `.accessory` after setup completes
+- Microphone permission uses `AVAudioApplication.requestRecordPermission` (not the older `AVCaptureDevice` API)
 
 ## whisper-cli Invocation
 

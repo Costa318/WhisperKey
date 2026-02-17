@@ -182,11 +182,12 @@ Cleanup:
 Guide the user through macOS permissions. Show both as a checklist on a single screen:
 
 **Microphone (required):**
-- Button: **"Grant Microphone Access"**
-- Triggers `AVCaptureDevice.requestAccess(for: .audio)` → native macOS dialog appears
+- Button: **"Grant Access"**
+- Triggers `AVAudioApplication.requestRecordPermission` → native macOS dialog appears
+- Note: Requires `com.apple.security.device.audio-input` entitlement (Hardened Runtime) and the app must be in `.regular` activation policy (not `.accessory`) for the dialog to appear
 - After user responds, update status:
   - ✓ "Microphone access granted" (green)
-  - ✗ "Microphone access denied" (red) + button: "Open System Settings" → opens `x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone`
+  - ✗ "Access denied" (red) — microphone status is polled every 2s to detect changes
 - If denied: show note "WhisperKey cannot work without microphone access."
 
 **Accessibility (optional, for auto-paste):**
@@ -286,7 +287,8 @@ On every launch:
 1. Create new Xcode project: macOS App, SwiftUI lifecycle
 2. Configure as menu bar only app (set `LSUIElement = true` in Info.plist)
 3. Disable App Sandbox in entitlements (needed for subprocess + `~/.whisperkey/` access)
-4. Add `NSMicrophoneUsageDescription` in Info.plist: "WhisperKey needs microphone access to record your speech for transcription."
+4. Add `com.apple.security.device.audio-input` entitlement (required by Hardened Runtime for mic access)
+5. Add `NSMicrophoneUsageDescription` in Info.plist: "WhisperKey needs microphone access to record your speech for transcription."
 5. Set up GitHub repo with .gitignore for Xcode/Swift
 6. Add to .gitignore: `*.bin`, `.whisperkey/`
 
@@ -377,7 +379,8 @@ WhisperKey/
 │   ├── Utilities/
 │   │   └── Preferences.swift            # UserDefaults wrapper for all settings
 │   ├── Assets.xcassets
-│   └── Info.plist
+│   ├── Info.plist
+│   └── WhisperKey.entitlements
 ├── README.md
 ├── CLAUDE.md                             # This file
 └── .gitignore
@@ -433,3 +436,8 @@ Note: No `scripts/` directory. All setup logic lives in `SetupManager.swift` and
 - [ ] Automatic silence detection to auto-stop recording
 - [ ] Sparkle framework for auto-updates
 - [ ] Pre-compiled whisper-cli binary download (skip compilation step, no Xcode CLT needed)
+
+### Implemented Improvements (not in original MVP scope)
+- [x] Auto-download cmake if not installed on system (downloads temporary copy from GitHub releases)
+- [x] DMG installer with Applications shortcut
+- [x] GitHub Releases distribution
