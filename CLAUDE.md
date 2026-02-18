@@ -12,7 +12,8 @@ WhisperKey is a macOS menu bar app that transcribes speech locally using whisper
 - Menu bar app (`LSUIElement = true`, no dock icon)
 - App Sandbox **disabled** (required for subprocess execution and `~/.whisperkey/` access)
 - whisper.cpp called as CLI subprocess (not linked as library) — this is intentional for memory isolation
-- HotKey SPM package (https://github.com/soffes/HotKey) for global hotkey
+- HotKey SPM package (https://github.com/soffes/HotKey) for global keyboard hotkeys
+- CGEvent tap for global mouse button triggers (middle click, side buttons, with optional double-click detection)
 - AVAudioEngine for audio capture (16kHz, mono, 16-bit WAV)
 
 ## Build & Run
@@ -33,13 +34,13 @@ Open `WhisperKey.xcodeproj` in Xcode for standard build/run/debug workflow.
 
 **App state machine:** idle → recording → transcribing → idle (managed by `AppState`)
 
-**Key flow:** Global hotkey (⌥Space) toggles recording. On stop, audio is saved as temp WAV, whisper-cli subprocess runs, result goes to clipboard (and optionally auto-pasted via CGEvent Cmd+V).
+**Key flow:** A configurable trigger (default: ⌥Y keyboard or double middle click) toggles recording. On stop, audio is saved as temp WAV, whisper-cli subprocess runs, result goes to clipboard (and optionally auto-pasted via CGEvent Cmd+V).
 
 **Module layout:**
 - `App/` — Entry point (`WhisperKeyApp`) and observable `AppState`
 - `Setup/` — First-launch wizard: `SetupManager` (Process() calls for git clone, cmake, compile), `ModelDownloader` (URLSessionDownloadTask with progress), `PermissionManager`, `FirstLaunchView`
 - `MenuBar/` — `StatusBarController` (NSStatusItem with 3 visual states), `SettingsView`
-- `Core/` — `AudioRecorder` (AVAudioEngine), `WhisperTranscriber` (subprocess management), `OutputManager` (clipboard + paste simulation), `HotkeyManager`
+- `Core/` — `AudioRecorder` (AVAudioEngine), `WhisperTranscriber` (subprocess management), `OutputManager` (clipboard + paste simulation), `HotkeyManager` (keyboard triggers via HotKey), `MouseTriggerManager` (mouse button triggers via CGEvent tap)
 - `Utilities/` — `Preferences` (UserDefaults wrapper)
 
 ## Standard Paths

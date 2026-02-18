@@ -1,12 +1,12 @@
 # WhisperKey
 
-Lightweight local speech-to-text for macOS. Press a hotkey, speak, and your words are transcribed and pasted — all running locally on your Mac. No cloud, no subscription, no data leaves your machine.
+Lightweight local speech-to-text for macOS. Press a hotkey or mouse button, speak, and your words are transcribed and pasted — all running locally on your Mac. No cloud, no subscription, no data leaves your machine.
 
 WhisperKey sits in your menu bar and uses [whisper.cpp](https://github.com/ggerganov/whisper.cpp) under the hood. When you're not transcribing, it uses virtually no resources (~15MB RAM). The speech model only loads during transcription and is fully released afterward.
 
 ## Features
 
-- **Global hotkey** (default: ⌥Space) — press to record, press again to transcribe
+- **Flexible triggers** — keyboard hotkey (default: ⌥Y) or mouse button (default: double middle click) to record and transcribe
 - **Fully local** — everything runs on-device, nothing is sent to the cloud
 - **Minimal footprint** — <20MB RAM when idle, model memory released after each transcription
 - **Auto-paste** — transcribed text is automatically pasted into your active app (optional)
@@ -79,9 +79,9 @@ Everything is installed to `~/.whisperkey/`:
 
 ## Usage
 
-1. Press **⌥Space** (or your configured hotkey) to start recording
+1. Press **⌥Y** (or your configured trigger — keyboard hotkey or mouse button) to start recording
 2. Speak
-3. Press the hotkey again to stop recording and transcribe
+3. Press the trigger again to stop recording and transcribe
 4. The transcribed text is copied to your clipboard and optionally auto-pasted
 
 The menu bar icon shows the current state:
@@ -93,7 +93,7 @@ The menu bar icon shows the current state:
 
 Click the menu bar icon and select **Settings** to configure:
 
-- **Hotkey** — click the hotkey field and press a new key combination
+- **Triggers** — two configurable trigger slots (primary + alternative), each accepts a keyboard hotkey or mouse button action. Click to record a new trigger: press a key combo, click a mouse button, or double-click for a double-click trigger
 - **Language** — Auto (recommended) or pin a specific language from 20+ options
 - **Auto-paste** — automatically paste transcriptions into the active app
 - **Launch at Login** — start WhisperKey when you log in
@@ -120,8 +120,8 @@ Audio is captured at 16kHz mono via AVAudioEngine, converted to WAV format, and 
 
 ## Troubleshooting
 
-**App doesn't respond to hotkey:**
-Make sure no other app is using the same key combination. Try changing the hotkey in Settings.
+**App doesn't respond to trigger:**
+Make sure no other app is using the same key combination. Try changing the trigger in Settings. For mouse triggers, Accessibility permission is required — check System Settings > Privacy & Security > Accessibility.
 
 **Transcription is empty or inaccurate:**
 Check that your microphone is working and you're speaking clearly. The medium model works best with clear speech in English or German.

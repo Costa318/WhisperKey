@@ -375,7 +375,8 @@ WhisperKey/
 │   │   ├── AudioRecorder.swift           # AVAudioEngine recording logic
 │   │   ├── WhisperTranscriber.swift      # Subprocess management for whisper-cli
 │   │   ├── OutputManager.swift           # Clipboard + paste simulation
-│   │   └── HotkeyManager.swift          # Global hotkey registration
+│   │   ├── HotkeyManager.swift          # Keyboard trigger registration (HotKey SPM)
+│   │   └── MouseTriggerManager.swift    # Mouse button trigger (CGEvent tap, double-click detection)
 │   ├── Utilities/
 │   │   └── Preferences.swift            # UserDefaults wrapper for all settings
 │   ├── Assets.xcassets
@@ -441,3 +442,4 @@ Note: No `scripts/` directory. All setup logic lives in `SetupManager.swift` and
 - [x] Auto-download cmake if not installed on system (downloads temporary copy from GitHub releases)
 - [x] DMG installer with Applications shortcut
 - [x] GitHub Releases distribution
+- [x] Unified trigger system: two configurable trigger slots (primary + alternative), each supports keyboard hotkey or mouse button (with double-click detection)
