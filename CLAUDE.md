@@ -34,7 +34,7 @@ Open `WhisperKey.xcodeproj` in Xcode for standard build/run/debug workflow.
 
 **App state machine:** idle → recording → transcribing → idle (managed by `AppState`)
 
-**Key flow:** A configurable trigger (default: ⌥Y keyboard or double middle click) toggles recording. On stop, audio is saved as temp WAV, whisper-cli subprocess runs, result goes to clipboard (and optionally auto-pasted via CGEvent Cmd+V).
+**Key flow:** A configurable trigger (default: ⌃⌥Y keyboard or double middle click) toggles recording. On stop, audio is saved as temp WAV, whisper-cli subprocess runs, result goes to clipboard (and optionally auto-pasted via CGEvent Cmd+V).
 
 **Module layout:**
 - `App/` — Entry point (`WhisperKeyApp`) and observable `AppState`

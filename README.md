@@ -6,7 +6,7 @@ WhisperKey sits in your menu bar and uses [whisper.cpp](https://github.com/ggerg
 
 ## Features
 
-- **Flexible triggers** — keyboard hotkey (default: ⌥Y) or mouse button (default: double middle click) to record and transcribe
+- **Flexible triggers** — keyboard hotkey (default: ⌃⌥Y) or mouse button (default: double middle click) to record and transcribe
 - **Fully local** — everything runs on-device, nothing is sent to the cloud
 - **Minimal footprint** — <20MB RAM when idle, model memory released after each transcription
 - **Auto-paste** — transcribed text is automatically pasted into your active app (optional)
@@ -79,7 +79,7 @@ Everything is installed to `~/.whisperkey/`:
 
 ## Usage
 
-1. Press **⌥Y** (or your configured trigger — keyboard hotkey or mouse button) to start recording
+1. Press **⌃⌥Y** (or your configured trigger — keyboard hotkey or mouse button) to start recording
 2. Speak
 3. Press the trigger again to stop recording and transcribe
 4. The transcribed text is copied to your clipboard and optionally auto-pasted

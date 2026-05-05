@@ -15,7 +15,7 @@ final class Preferences {
     var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: "launchAtLogin") } }
     var soundFeedback: Bool { didSet { defaults.set(soundFeedback, forKey: "soundFeedback") } }
 
-    // MARK: - Primary Trigger (default: ⌥Y keyboard)
+    // MARK: - Primary Trigger (default: ⌃⌥Y keyboard)
 
     /// "keyboard" or "mouse"
     var primaryType: String { didSet { defaults.set(primaryType, forKey: "primaryType") } }
@@ -65,10 +65,12 @@ final class Preferences {
             "autoPaste": true,
             "launchAtLogin": false,
             "soundFeedback": false,
-            // Primary trigger: ⌥Y (keyboard)
+            // Primary trigger: ⌃⌥Y (keyboard) — control modifier required because
+            // single-modifier ⌥+letter combos are claimed by macOS text input on
+            // non-US layouts (e.g. ⌥Y → "›" on German), bypassing Carbon hotkey dispatch.
             "primaryType": "keyboard",
             "primaryKeyCode": 0x10,  // Y
-            "primaryModifiers": NSEvent.ModifierFlags.option.rawValue,
+            "primaryModifiers": NSEvent.ModifierFlags([.control, .option]).rawValue,
             "primaryMouseButton": 2,
             "primaryDoubleClick": false,
             // Alternative trigger: double middle click (mouse)

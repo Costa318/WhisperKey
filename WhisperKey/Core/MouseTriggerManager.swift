@@ -19,8 +19,8 @@ final class MouseTriggerManager {
     var pendingTimestamp: CFAbsoluteTime = 0
     var pendingEvent: CGEvent?
     var doubleClickTimer: DispatchWorkItem?
-
-    private static let doubleClickInterval: CFAbsoluteTime = 0.3
+    /// Buttons whose next mouseUp must be swallowed to balance a suppressed mouseDown.
+    var suppressNextUp: Set<Int> = []
 
     func start() {
         stop()
@@ -62,6 +62,7 @@ final class MouseTriggerManager {
         doubleClickTimer = nil
         pendingButton = nil
         pendingEvent = nil
+        suppressNextUp.removeAll()
 
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
@@ -117,6 +118,28 @@ final class MouseTriggerManager {
     func replayEvent(_ event: CGEvent) {
         event.post(tap: .cgSessionEventTap)
     }
+
+    /// Replay the saved first-click DOWN at the cursor's *current* position, then
+    /// synthesize a matching UP. Posting the saved event at its original location
+    /// would warp the cursor back to where the click happened.
+    func replayPendingClickAtCurrentCursor() {
+        guard let savedEvent = pendingEvent else { return }
+        let buttonNumber = Int(savedEvent.getIntegerValueField(.mouseEventButtonNumber))
+        let location = CGEvent(source: nil)?.location ?? savedEvent.location
+
+        savedEvent.location = location
+        savedEvent.post(tap: .cgSessionEventTap)
+
+        if let upEvent = CGEvent(
+            mouseEventSource: nil,
+            mouseType: .otherMouseUp,
+            mouseCursorPosition: location,
+            mouseButton: CGMouseButton(rawValue: UInt32(buttonNumber)) ?? .center
+        ) {
+            upEvent.setIntegerValueField(.mouseEventButtonNumber, value: Int64(buttonNumber))
+            upEvent.post(tap: .cgSessionEventTap)
+        }
+    }
 }
 
 // MARK: - CGEvent Callback (free function required by C API)
@@ -144,13 +167,20 @@ private func mouseEventCallback(
     }
 
     let manager = Unmanaged<MouseTriggerManager>.fromOpaque(userInfo).takeUnretainedValue()
+    let buttonNumber = Int(event.getIntegerValueField(.mouseEventButtonNumber))
 
-    // Only handle otherMouseDown
+    // Swallow UPs paired with previously-suppressed DOWNs to keep event sequencing balanced.
+    if type == .otherMouseUp {
+        if manager.suppressNextUp.remove(buttonNumber) != nil {
+            return nil
+        }
+        return Unmanaged.passUnretained(event)
+    }
+
     guard type == .otherMouseDown else {
         return Unmanaged.passUnretained(event)
     }
 
-    let buttonNumber = Int(event.getIntegerValueField(.mouseEventButtonNumber))
     let eventFlags = NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue))
         .intersection([.command, .option, .control, .shift])
 
@@ -164,43 +194,49 @@ private func mouseEventCallback(
     }
 
     if !config.doubleClick {
-        // Simple single-click trigger — fire immediately and swallow
+        // Simple single-click trigger — fire immediately and swallow (DOWN + paired UP)
+        manager.suppressNextUp.insert(buttonNumber)
         manager.fireTrigger()
         return nil
     }
 
     // Double-click detection
     let now = CFAbsoluteTimeGetCurrent()
+    let interval = NSEvent.doubleClickInterval
 
     if manager.pendingButton == buttonNumber,
-        (now - manager.pendingTimestamp) < 0.3
+        (now - manager.pendingTimestamp) < interval
     {
-        // Second click within interval — fire trigger
+        // Second click within interval — fire trigger, swallow this DOWN and its UP
         manager.doubleClickTimer?.cancel()
         manager.doubleClickTimer = nil
         manager.pendingButton = nil
         manager.pendingEvent = nil
+        manager.suppressNextUp.insert(buttonNumber)
         manager.fireTrigger()
-        return nil  // swallow second click
+        return nil
     }
 
-    // First click — suppress and wait for potential second click
+    // First click — suppress (both DOWN and the paired UP) and wait for a possible second click
     manager.pendingButton = buttonNumber
     manager.pendingTimestamp = now
     manager.pendingEvent = event.copy()
+    manager.suppressNextUp.insert(buttonNumber)
 
     manager.doubleClickTimer?.cancel()
     let timer = DispatchWorkItem { [weak manager] in
         guard let manager = manager else { return }
-        // Timeout — no second click, replay the original
-        if let savedEvent = manager.pendingEvent {
-            manager.replayEvent(savedEvent)
-        }
+        // Timeout — replay the click at the cursor's *current* position
+        // (replaying the saved event at its original location would warp the cursor back).
+        manager.replayPendingClickAtCurrentCursor()
         manager.pendingButton = nil
         manager.pendingEvent = nil
+        // Leave suppressNextUp set: if the user is still holding the button,
+        // their eventual real UP must still be swallowed (we already posted our own UP).
+        // If the user already released, the flag was cleared when that UP arrived.
     }
     manager.doubleClickTimer = timer
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: timer)
+    DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: timer)
 
     return nil  // suppress first click while waiting
 }
