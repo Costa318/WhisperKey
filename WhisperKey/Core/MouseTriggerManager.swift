@@ -1,6 +1,12 @@
 import AppKit
 import ApplicationServices
 
+/// Marker stamped onto our own replayed events via a private CGEventSource so
+/// the callback can recognize them and let them through unchanged. Without it,
+/// a posted DOWN re-enters the tap and gets re-suppressed, leaving pendingButton
+/// permanently set and turning every later click into a phantom "second click".
+private let replayUserDataMarker: Int64 = 0x57484B5F52504C59  // "WHK_RPLY"
+
 final class MouseTriggerManager {
     var onTrigger: (() -> Void)?
 
@@ -21,6 +27,14 @@ final class MouseTriggerManager {
     var doubleClickTimer: DispatchWorkItem?
     /// Buttons whose next mouseUp must be swallowed to balance a suppressed mouseDown.
     var suppressNextUp: Set<Int> = []
+
+    /// Private event source used for replays — marked via userData so the callback
+    /// can identify our own posted events and avoid intercepting them.
+    private lazy var replaySource: CGEventSource? = {
+        let source = CGEventSource(stateID: .privateState)
+        source?.userData = replayUserDataMarker
+        return source
+    }()
 
     func start() {
         stop()
@@ -119,26 +133,40 @@ final class MouseTriggerManager {
         event.post(tap: .cgSessionEventTap)
     }
 
-    /// Replay the saved first-click DOWN at the cursor's *current* position, then
-    /// synthesize a matching UP. Posting the saved event at its original location
-    /// would warp the cursor back to where the click happened.
+    /// Synthesize a DOWN+UP at the cursor's *current* position using the marked
+    /// replaySource. We don't reuse the saved CGEvent because its source is the
+    /// user's HID (userData=0) and posting it would re-enter our own callback as
+    /// an indistinguishable user click — re-suppressing it and leaving pendingButton
+    /// set forever.
     func replayPendingClickAtCurrentCursor() {
         guard let savedEvent = pendingEvent else { return }
         let buttonNumber = Int(savedEvent.getIntegerValueField(.mouseEventButtonNumber))
+        let flags = savedEvent.flags
         let location = CGEvent(source: nil)?.location ?? savedEvent.location
 
-        savedEvent.location = location
-        savedEvent.post(tap: .cgSessionEventTap)
+        // CGEvent's mouseButton parameter rejects values > .center (2). For high
+        // button numbers (3=back, 4=forward) we pass .left as a placeholder and
+        // override mouseEventButtonNumber, which is what apps actually read for
+        // "other" mouse events.
+        let baseButton: CGMouseButton =
+            CGMouseButton(rawValue: UInt32(buttonNumber)) ?? .left
 
-        if let upEvent = CGEvent(
-            mouseEventSource: nil,
-            mouseType: .otherMouseUp,
-            mouseCursorPosition: location,
-            mouseButton: CGMouseButton(rawValue: UInt32(buttonNumber)) ?? .center
-        ) {
-            upEvent.setIntegerValueField(.mouseEventButtonNumber, value: Int64(buttonNumber))
-            upEvent.post(tap: .cgSessionEventTap)
+        func post(_ type: CGEventType) {
+            guard
+                let event = CGEvent(
+                    mouseEventSource: replaySource,
+                    mouseType: type,
+                    mouseCursorPosition: location,
+                    mouseButton: baseButton
+                )
+            else { return }
+            event.setIntegerValueField(.mouseEventButtonNumber, value: Int64(buttonNumber))
+            event.flags = flags
+            event.post(tap: .cgSessionEventTap)
         }
+
+        post(.otherMouseDown)
+        post(.otherMouseUp)
     }
 }
 
@@ -163,6 +191,13 @@ private func mouseEventCallback(
     }
 
     guard let userInfo = userInfo else {
+        return Unmanaged.passUnretained(event)
+    }
+
+    // Pass through our own replayed events (identified by the userData marker on
+    // their CGEventSource) without any further processing, otherwise they re-enter
+    // the suppression logic and lock pendingButton forever.
+    if event.getIntegerValueField(.eventSourceUserData) == replayUserDataMarker {
         return Unmanaged.passUnretained(event)
     }
 
